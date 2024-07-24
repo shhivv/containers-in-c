@@ -29,7 +29,6 @@ int run(void *arg) {
   char cgroups[] = "/sys/fs/cgroup/pids/ccontainer";
 
   mkdir(cgroups, 0755);
-  // close unused pipes on child end
 
   FILE *pids_max = fopen("/sys/fs/cgroup/pids/ccontainer/pids.max", "w");
   FILE *nor = fopen("/sys/fs/cgroup/pids/ccontainer/notify_on_release", "w");
