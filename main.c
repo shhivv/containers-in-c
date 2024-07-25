@@ -9,6 +9,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+// cgroup defaults
+#define MAX_PIDS 20
+#define MAX_MEMORY (1024 * 1024 * 400) // 400 mib
+
 #define STACK_SIZE (1024 * 1024)
 char **g_argv;
 int p_stdout[2], p_stderr[2];
@@ -26,25 +30,51 @@ int run(void *arg) {
   close(p_stdout[1]);
   close(p_stderr[1]);
 
-  char cgroups[] = "/sys/fs/cgroup/pids/ccontainer";
+  // memory
+  char memgroup[] = "/sys/fs/cgroup/memory/ccontainer";
 
-  mkdir(cgroups, 0755);
+  mkdir(memgroup, 0755);
 
-  FILE *pids_max = fopen("/sys/fs/cgroup/pids/ccontainer/pids.max", "w");
-  FILE *nor = fopen("/sys/fs/cgroup/pids/ccontainer/notify_on_release", "w");
-  FILE *cg_procs = fopen("/sys/fs/cgroup/pids/ccontainer/cgroup.procs", "w");
-  if (pids_max == NULL || nor == NULL || cg_procs == NULL) {
-    perror("control group");
+  FILE *mem_max =
+      fopen("/sys/fs/cgroup/memory/ccontainer/memory.limit_in_bytes", "w");
+  FILE *nor_mem =
+      fopen("/sys/fs/cgroup/memory/ccontainer/notify_on_release", "w");
+  FILE *mem_procs = fopen("/sys/fs/cgroup/memory/ccontainer/cgroup.procs", "w");
+  if (mem_max == NULL || nor_mem == NULL || mem_procs == NULL) {
+    perror("control group(memory)");
     exit(1);
   }
 
-  fprintf(pids_max, "%s", "20");
-  fprintf(nor, "%s", "1");
-  fprintf(cg_procs, "%d", getpid());
+  fprintf(mem_max, "%d", MAX_MEMORY);
+  fprintf(nor_mem, "%s", "1");
+  fprintf(mem_procs, "%d", getpid());
+
+  fclose(mem_max);
+  fclose(nor_mem);
+  fclose(mem_procs);
+
+  // pids
+  char pids_group[] = "/sys/fs/cgroup/pids/ccontainer";
+
+  mkdir(pids_group, 0755);
+
+  FILE *pids_max = fopen("/sys/fs/cgroup/pids/ccontainer/pids.max", "w");
+  FILE *pids_nor =
+      fopen("/sys/fs/cgroup/pids/ccontainer/notify_on_release", "w");
+  FILE *pids_procs = fopen("/sys/fs/cgroup/pids/ccontainer/cgroup.procs", "w");
+
+  if (pids_max == NULL || pids_nor == NULL || pids_procs == NULL) {
+    perror("control group(pids)");
+    exit(1);
+  }
+
+  fprintf(pids_max, "%d", MAX_PIDS);
+  fprintf(pids_nor, "%s", "1");
+  fprintf(pids_procs, "%d", getpid());
 
   fclose(pids_max);
-  fclose(nor);
-  fclose(cg_procs);
+  fclose(pids_nor);
+  fclose(pids_procs);
 
   int sh = sethostname("child-container", strlen("child-container"));
   if (sh == -1) {
